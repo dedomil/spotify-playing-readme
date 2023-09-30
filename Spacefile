@@ -1,0 +1,22 @@
+# Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
+v: 0
+micros:
+  - name: spotify-api
+    src: ./
+    engine: nodejs16
+    primary: true
+    public: true
+    presets:
+      env:
+        - name: CLIENTID
+          description: Spotify Client ID
+          default: ""
+        - name: CLIENTSECRET
+          description: Spotify Client Secret
+          default: ""
+        - name: REDIRECT
+          description: Spotify Callback Redirect URL
+          default: ""
+        - name: USERID
+          description: Spotify Username
+          default: ""
