@@ -1,18 +1,24 @@
 const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
-const { clientId, clientSecret, userId, redirectUrl } = require("./config.js");
-const checkAccessTokenExpiry = require("./middlewares/checkAccessTokenExpiry.js");
-const db = require("./database/database.js");
+const fs = require("fs");
+
+const { clientId, clientSecret, userId, redirectUrl, loginSecret } = require("./config.js");
+const { checkAccessTokenExpiry } = require("./middlewares");
+const { generateBars, imageToBase64 } = require("./functions");
+const db = require("./database");
 
 const app = express();
+app.set("view engine", "ejs");
 
-app.get("/login", async ({ res }) => {
+app.get("/login", async (req, res) => {
   try {
+    let { secret } = req.query;
+    if (!secret && secret != loginSecret) return res.send({ message: "please enter valid login secret" });
     res.redirect(`https://accounts.spotify.com/authorize?${qs.stringify({
       "client_id": clientId,
       "response_type": "code",
-      "scope": "user-read-currently-playing",
+      "scope": "user-read-currently-playing,user-read-recently-played",
       "redirect_uri": redirectUrl,
     })}`);
   } catch ({ message }) {
@@ -50,6 +56,7 @@ app.get("/callback", async (req, res) => {
 
 app.get("/", checkAccessTokenExpiry, async (req, res) => {
   try {
+    let { spin, scan, theme, rainbow } = req.query;
     let { data } = await axios.request({
       url: "https://api.spotify.com/v1/me/player/currently-playing",
       method: "GET",
@@ -57,9 +64,43 @@ app.get("/", checkAccessTokenExpiry, async (req, res) => {
         "Authorization": `Bearer ${req.accessToken}`
       }
     });
-    res.send({ ...data });
+    let item, cover;
+    if (Object.keys(data).length != 0) {
+      item = data.item;
+    } else {
+      let { data: { items } } = await axios.request({
+        url: "https://api.spotify.com/v1/me/player/recently-played?limit=1",
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${req.accessToken}`
+        }
+      });
+      item = items[0].track;
+    }
+    if (item.album.images.length != 0) {
+      cover = await imageToBase64(item.album.images[1].url);
+    } else {
+      cover = fs.readFileSync("./base64/placeholder_image.txt", { encoding: "utf-8" });
+    }
+    let scanCode = scan ? await imageToBase64(`https://scannables.scdn.co/uri/plain/png/000000/white/640/${item.uri}`) : "";
+    res.set("content-type", "image/svg+xml");
+    res.set("cache-control", "max-age=0, no-cache, no-store, must-revalidate");
+    res.render("spotify", {
+      spin,
+      scan,
+      theme,
+      rainbow,
+      scanCode,
+      cover,
+      id: item.id,
+      name: item.name,
+      barCount: scan ? 10 : 12,
+      artist: item.artists[0].name,
+      bars: generateBars(scan ? 10 : 12, rainbow),
+      logo: fs.readFileSync("./base64/spotify_logo.txt", { encoding: "utf-8" })
+    });
   } catch ({ message }) {
-    res.redirect({ message });
+    res.status(500).send({ message });
   }
 })
 

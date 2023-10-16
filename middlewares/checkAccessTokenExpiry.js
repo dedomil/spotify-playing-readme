@@ -1,6 +1,7 @@
 const qs = require("qs");
+const axios = require("axios");
 const { clientId, clientSecret, userId } = require("../config.js");
-const db = require("../database/database.js");
+const db = require("../database/index.js");
 
 const checkAccessTokenExpiry = async (req, res, next) => {
   try {
@@ -32,8 +33,8 @@ const checkAccessTokenExpiry = async (req, res, next) => {
       req.accessToken = accessToken;
       next();
     }
-  } catch ({ message }) {
-    res.redirect({ message });
+  } catch (error) {
+    res.status(401).send({ message: "try to login, refresh token isnt valid" });
   }
 }
 
