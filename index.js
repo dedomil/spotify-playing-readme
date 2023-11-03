@@ -104,6 +104,34 @@ app.get("/", checkAccessTokenExpiry, async (req, res) => {
   }
 })
 
+app.get("/play", checkAccessTokenExpiry, async (req, res) => {
+  try {
+    let item;
+    let { data } = await axios.request({
+      url: "https://api.spotify.com/v1/me/player/currently-playing",
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${req.accessToken}`
+      }
+    });
+    if (Object.keys(data).length != 0) {
+      item = data.item;
+    } else {
+      let { data: { items } } = await axios.request({
+        url: "https://api.spotify.com/v1/me/player/recently-played?limit=1",
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${req.accessToken}`
+        }
+      });
+      item = items[0].track;
+    }
+    res.redirect(item.external_urls.spotify || "https://open.spotify.com/");
+  } catch ({ message }) {
+    res.status(500).send({ message });
+  }
+})
+
 app.listen(process.env.PORT || 3000, () => {
   console.log(`running on port ${process.env.PORT || 3000}`);
 });
